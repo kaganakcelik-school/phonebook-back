@@ -33,7 +33,9 @@ app.get('/', (request, response) => {
 })
 
 app.get('/info', (request, response) => {
-	response.send('<p>Phonebook has info for ' + persons.length + ' people <br/>' + new Date() + '</p>')
+	Person.find({}).then(persons => {
+		response.send('<p>Phonebook has info for ' + persons.length + ' people <br/>' + new Date() + '</p>')
+	})
 })
 
 app.get('/api/persons', (request, response) => {
@@ -44,14 +46,6 @@ app.get('/api/persons', (request, response) => {
 })
 
 app.get('/api/persons/:id', (request, response) => {
-	const id = Number(request.params.id)
-	// const person = persons.find(n => n.id === id)
-
-	// if (person) {
-	// 	response.json(person)
-	// } else {
-	// 	response.status(404).end()
-	// }
 
 	Person.findById(request.params.id).then(person => {
 		response.json(person)
@@ -107,49 +101,44 @@ app.post('/api/persons', (request, response) => {
 	// response.json(person)
 })
 
-app.put('/api/persons/:id', (request, response) => {
+app.put('/api/persons/:id', (request, response, next) => {
 	const body = request.body
-	const id = request.params.id
 
-	if (!body.number) {
-		return response.status(400).json({ 
-			error: 'content missing' 
-		})
+	const person = {
+		name: body.name,
+		number: body.number,
 	}
 
-	Person.findById(request.params.id).then(person => {
-		person.number = body.number
-		person.save()
-		response.json(person)
-	})
+	Person.findByIdAndUpdate(request.params.id, person, { new: true })
+		.then(updatedPerson => {
+			response.json(updatedPerson)
+		})
+		.catch(error => next(error))
 
 
-	// Person.find({}).then(persons => {
-	// 	persons.find(p => p.id === id) = {name: persons.find(p => p.id === id).name, number: body.number}
-	// 	response.json(persons.find(p => p.id === Number(request.params.id)))
-	// })
-
-	// persons.find(p => p.id === Number(request.params.id)).number = body.number
 })
 
-app.delete('/api/persons/:id', (request, response) => {
-	const id = Number(request.params.id)
-	// persons = persons.filter(p => p.id !== id)
-
-	// Person.find({}).then(persons => {
-	// 	persons = persons.filter(p => p.id !== id)
-	// 	persons.forEach(p => p.save())
-	// 	response.status(204).end()
-	// })
-
-	Person.deleteOne({_id: request.params.id}).then(person => {
-		response.status(204).end()
-	})
-
-	// response.status(204).end()
+app.delete('/api/persons/:id', (request, response, next) => {
+	Person.findByIdAndDelete(request.params.id)
+		.then(result => {
+			response.status(204).end()
+		})
+		.catch(error => next(error))
 })
 
-const PORT = process.env.PORT || 3001
+const errorHandler = (error, request, response, next) => {
+	console.log(error.message)
+
+	if (error.name === 'CastError') {
+		return response.status(400).send({error: 'malformatted id'})
+	}
+
+	next(error)
+}
+
+app.use(errorHandler)
+
+const PORT = process.env.PORT
 app.listen(PORT, () => {
 	console.log(`Server running on port ${PORT}`)
 })
